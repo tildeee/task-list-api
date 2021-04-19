@@ -1,4 +1,4 @@
-from flask import Flask, Blueprint, request, jsonify, redirect, url_for, make_response
+from flask import Blueprint, request, jsonify, redirect, url_for, make_response
 from app.models.task import Task
 from app.models.goal import Goal
 from app import db
@@ -63,7 +63,7 @@ def tasks():
         db.session.add(new_task)
         db.session.commit()
 
-        return {"task": build_dict_from_task(new_task)}
+        return make_response({"task": build_dict_from_task(new_task)}, 201)
 
 
 @task_page.route('/tasks/<task_id>', methods=['GET', 'PUT', 'DELETE'])
@@ -101,16 +101,24 @@ def post_task_complete_to_slack(message):
     return response.json()
 
 
-@task_page.route('/tasks/<task_id>/complete', methods=['PATCH'])
-def toggle_complete(task_id):
+@task_page.route('/tasks/<task_id>/mark_complete', methods=['PATCH'])
+def mark_complete(task_id):
     task = Task.query.get_or_404(task_id)
 
-    if task.completed_at:
-        task.completed_at = None
-    else:
-        task.completed_at = datetime.utcnow()
-        slack_response = post_task_complete_to_slack(
-            f"Someone just completed the task {task.title}")
+    task.completed_at = datetime.utcnow()
+    slack_response = post_task_complete_to_slack(
+        f"Someone just completed the task {task.title}")
+
+    db.session.commit()
+
+    return {"task": build_dict_from_task(task)}
+
+
+@task_page.route('/tasks/<task_id>/mark_incomplete', methods=['PATCH'])
+def mark_incomplete(task_id):
+    task = Task.query.get_or_404(task_id)
+
+    task.completed_at = None
 
     db.session.commit()
 
@@ -151,7 +159,7 @@ def goals():
         db.session.add(new_goal)
         db.session.commit()
 
-        return {"goal": build_dict_from_goal(new_goal)}
+        return make_response({"goal": build_dict_from_goal(new_goal)}, 201)
 
 
 @task_page.route('/goals/<goal_id>', methods=['GET', 'PUT', 'DELETE'])
